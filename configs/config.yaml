@@ -8,5 +8,6 @@ model:
 train:
   batch_size: 64
   lr: 0.0005
-  epochs: 20
+  epochs: 50
   device: "cuda"
+  weight_decay: 0.05

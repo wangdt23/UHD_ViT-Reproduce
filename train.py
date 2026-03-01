@@ -6,6 +6,7 @@ import yaml
 from tqdm import tqdm
 from src.models.vit import HierarchicalViT
 from src.data.loader import get_loaders
+import math
 
 def calculate_accuracy(outputs, labels):
     _, predicted = torch.max(outputs, 1)
@@ -26,9 +27,20 @@ def train():
     model_name = model_config.pop('name')
     model = HierarchicalViT(**model_config).to(device)
     criterion = nn.CrossEntropyLoss() # loss function for classification
-    optimizer = optim.AdamW(model.parameters(), lr=config['train']['lr']) # AdamW optimizer with weight decay for better generalization
+    optimizer = optim.AdamW(model.parameters(), lr=config['train']['lr'],weight_decay=config['train']['weight_decay']) # AdamW optimizer with weight decay for better generalization
 
-    schedular = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config['train']['epochs']) # cosine annealing learning rate scheduler for smoother convergence
+    # schedular = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config['train']['epochs']) # cosine annealing learning rate scheduler for smoother convergence
+
+    def get_lr_scheduler(optimizer, epochs):
+        # Implement a learning rate scheduler with linear warmup for the first few epochs followed by cosine annealing
+        warmup_epochs = 5
+        def lr_lambda(epoch):
+            if epoch < warmup_epochs:
+                return (epoch + 1) / warmup_epochs
+            return 0.5 * (1 + math.cos(math.pi * (epoch - warmup_epochs) / (epochs - warmup_epochs)))
+        return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+    scheduler = get_lr_scheduler(optimizer, config['train']['epochs'])
 
     best_acc = 0.0
 
@@ -54,7 +66,7 @@ def train():
         # 2. Validate on test set
         val_loss, val_acc = validate(model, test_loader, criterion, device)
         print(f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_acc:.2f}%")
-        schedular.step() # update learning rate according to scheduler
+        scheduler.step() # update learning rate according to scheduler
         print(f"Learning Rate after epoch {epoch+1}: {optimizer.param_groups[0]['lr']:.6f}") # print current learning rate for debugging
 
         # 3. Save best model
