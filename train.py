@@ -28,6 +28,8 @@ def train():
     criterion = nn.CrossEntropyLoss() # loss function for classification
     optimizer = optim.AdamW(model.parameters(), lr=config['train']['lr']) # AdamW optimizer with weight decay for better generalization
 
+    schedular = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config['train']['epochs']) # cosine annealing learning rate scheduler for smoother convergence
+
     best_acc = 0.0
 
     # Training loop
@@ -52,13 +54,15 @@ def train():
         # 2. Validate on test set
         val_loss, val_acc = validate(model, test_loader, criterion, device)
         print(f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_acc:.2f}%")
+        schedular.step() # update learning rate according to scheduler
+        print(f"Learning Rate after epoch {epoch+1}: {optimizer.param_groups[0]['lr']:.6f}") # print current learning rate for debugging
 
         # 3. Save best model
         if val_acc > best_acc:
             best_acc = val_acc
             torch.save(model.state_dict(), "best_model.pth")
             print(f"New best model saved with accuracy: {best_acc:.2f}%")
-            
+
     print(f"Training Complete. Best Validation Accuracy: {best_acc:.2f}%")
 
     print("Training Finished!")
